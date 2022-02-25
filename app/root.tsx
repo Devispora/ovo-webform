@@ -8,7 +8,7 @@ import {
     ScrollRestoration,
 } from "remix";
 import type { MetaFunction } from "remix";
-import styles from "./tailwind.css";
+import tailwind from "./tailwind.css";
 
 export const meta: MetaFunction = () => {
     return {
@@ -17,7 +17,7 @@ export const meta: MetaFunction = () => {
 };
 
 export const links: LinksFunction = () => {
-    return [{ rel: "stylesheet", href: styles }];
+    return [{ rel: "stylesheet", href: tailwind }];
 };
 
 function Document({
@@ -38,7 +38,8 @@ function Document({
             <body>
                 {children}
                 <Scripts />
-                {process.env.NODE_ENV === "development" && <LiveReload />}
+                {/*Doesn't work for now - complains about process undefined
+                <LiveReload/>*/}
             </body>
         </html>
     );

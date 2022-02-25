@@ -1,4 +1,4 @@
-import { addHours, parse, startOfHour } from "date-fns";
+import { addHours, parse, startOfHour, roundToNearestMinutes } from "date-fns";
 import { format, zonedTimeToUtc } from "date-fns-tz";
 import { ChangeEvent, useEffect, useState } from "react";
 import {
@@ -10,15 +10,25 @@ import {
     useLoaderData,
     useFetcher,
     HeadersFunction,
+    LinksFunction,
 } from "remix";
 import { getContinentBases, reserveBases } from "~/services/bases.server";
 import { Base, Continent } from "~/services/constants";
 import { hasActiveSession } from "~/services/session.server";
 import { ClientOnly } from "remix-utils";
+import DatePicker from "~/components/DatePicker";
+import antdStyles from "antd/dist/antd.css";
+import { CalendarFilled } from "@ant-design/icons";
+
+const { RangePicker } = DatePicker;
 
 type LoaderData = {
     continent: Continent;
     bases: Base[];
+};
+
+export const links: LinksFunction = () => {
+    return [{ rel: "stylesheet", href: antdStyles }];
 };
 
 export const action: ActionFunction = async ({ request, context }) => {
@@ -29,8 +39,12 @@ export const action: ActionFunction = async ({ request, context }) => {
     const token: string = session.get("token");
 
     if (token) {
+        const formData = Object.fromEntries(await request.formData());
+
         const { groups, timzone, startTimestamp, endTimestamp, base } =
-            Object.fromEntries(await request.formData());
+            formData;
+
+        console.log(formData);
 
         const startDatetime = zonedTimeToUtc(
             startTimestamp as string,
@@ -42,6 +56,7 @@ export const action: ActionFunction = async ({ request, context }) => {
             timzone as string
         );
 
+        /*
         try {
             const response = await reserveBases(
                 token,
@@ -55,7 +70,7 @@ export const action: ActionFunction = async ({ request, context }) => {
             console.log(await response.json());
         } catch (err) {
             console.log(err);
-        }
+        }*/
     }
 
     return redirect("/");
@@ -99,9 +114,13 @@ export default function NewReservation() {
     let bases = fetcher.data ? fetcher.data.bases : initialBases;
     let continent = fetcher.data ? fetcher.data.continent : initialContinent;
 
-    let [startTimestamp, setStartTimestamp] = useState<Date>(new Date());
+    let [startTimestamp, setStartTimestamp] = useState<Date>(
+        roundToNearestMinutes(new Date(), {
+            nearestTo: 30,
+        })
+    );
     let [endTimestamp, setEndTimestamp] = useState<Date>(
-        addHours(startTimestamp, 2)
+        addHours(startTimestamp, 1)
     );
     let [customEnd, setCustomEnd] = useState<boolean>(false);
 
@@ -129,112 +148,174 @@ export default function NewReservation() {
         );
     }
 
-    const tzAbbrv = format(new Date(), "z");
+    function handleRangeChange(
+        values: [Date | null, Date | null] | null,
+        _dateStrings: [string, string],
+        info: { range: "start" | "end" }
+    ) {
+        if (info.range === "start") {
+            if (values?.[0]) {
+                setStartTimestamp(values[0]);
+            }
+        } else {
+            if (values?.[1]) {
+                setCustomEnd(true);
+                setEndTimestamp(values[1]);
+            }
+        }
+    }
+
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     return (
-        <div className="w-full h-screen container grid m-auto justify-center content-center">
+        <div className="m-auto grid h-full w-full content-center justify-center bg-slate-100">
             <ClientOnly>
-                <Form
-                    reloadDocument
-                    method="post"
-                    className="bg-slate-200 rounded-lg p-4"
-                >
-                    <div className="mb-6">
-                        <label className="block" htmlFor="groups">
-                            <span className="leading-7 text-sm text-current">
-                                Groups
-                            </span>
-                        </label>
-                        <input
-                            name="groups"
-                            type="text"
-                            required
-                            className="rounded"
-                        ></input>
+                <Form reloadDocument method="post" className="rounded-lg p-4">
+                    <div className="mt-10 sm:mt-0">
+                        <div className="md:grid md:grid-cols-2 md:gap-6">
+                            <div className="mt-5 md:col-span-2 md:mt-0">
+                                <div className="overflow-hidden shadow sm:rounded-md">
+                                    <div className="bg-white px-4 py-5 sm:p-6">
+                                        <div className="grid grid-cols-6 gap-6">
+                                            <div className="col-span-6 sm:col-span-3">
+                                                <label
+                                                    htmlFor="groups"
+                                                    className="block text-sm font-medium text-gray-700"
+                                                >
+                                                    Groups
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    name="groups"
+                                                    id="groups"
+                                                    required
+                                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                                />
+                                            </div>
+                                            <div className="col-span-6 sm:col-span-4">
+                                                <label
+                                                    htmlFor="timerange"
+                                                    className="block text-sm font-medium text-gray-700"
+                                                >
+                                                    Time Range
+                                                </label>
+                                                <RangePicker
+                                                    name="timerange"
+                                                    showTime
+                                                    bordered
+                                                    minuteStep={15}
+                                                    size="large"
+                                                    format="YYYY-MM-DD HH:mm z"
+                                                    defaultValue={[
+                                                        startTimestamp,
+                                                        endTimestamp,
+                                                    ]}
+                                                    onCalendarChange={
+                                                        handleRangeChange
+                                                    }
+                                                    suffixIcon={
+                                                        <CalendarFilled />
+                                                    }
+                                                    style={{
+                                                        borderRadius: "0.25rem",
+                                                    }}
+                                                    renderExtraFooter={() => {
+                                                        return <p>Test</p>;
+                                                    }}
+                                                    value={[
+                                                        startTimestamp,
+                                                        endTimestamp,
+                                                    ]}
+                                                ></RangePicker>
+                                            </div>
+                                            <div className="col-span-6 sm:col-span-2 sm:col-start-1">
+                                                <label
+                                                    htmlFor="continent"
+                                                    className="block text-sm font-medium text-gray-700"
+                                                >
+                                                    Continent
+                                                </label>
+                                                <select
+                                                    id="continent"
+                                                    name="continent"
+                                                    onChange={
+                                                        handleContinentChange
+                                                    }
+                                                    className="mt-1 block w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                                                >
+                                                    <option value="Indar">
+                                                        Indar
+                                                    </option>
+                                                    <option value="Amerish">
+                                                        Amerish
+                                                    </option>
+                                                    <option value="Esamir">
+                                                        Esamir
+                                                    </option>
+                                                    <option value="Hossin">
+                                                        Hossin
+                                                    </option>
+                                                    <option value="Oshur">
+                                                        Oshur
+                                                    </option>
+                                                </select>
+                                            </div>
+                                            <div className="col-span-6 sm:col-span-6 lg:col-span-3">
+                                                <label
+                                                    htmlFor="base"
+                                                    className="block text-sm font-medium text-gray-700"
+                                                >
+                                                    Base
+                                                </label>
+                                                <select
+                                                    name="base"
+                                                    required
+                                                    className="mt-1 block w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                                                >
+                                                    {bases.map((base) => (
+                                                        <option
+                                                            key={base.id}
+                                                            value={base.id}
+                                                        >
+                                                            {base.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="col-span-6 sm:col-span-6 lg:col-span-1"></div>
+                                        </div>
+                                    </div>
+                                    <div className="bg-gray-50 px-4 py-3 text-right sm:px-6">
+                                        <button
+                                            type="submit"
+                                            className="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                        >
+                                            Reserve
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <input
                         name="timezone"
                         type="hidden"
                         hidden
+                        readOnly
                         value={timezone}
                     ></input>
-                    <div className="mb-6">
-                        <label className="block" htmlFor="startTimestamp">
-                            <span className="leading-7 text-sm text-current">
-                                Start Date & Time
-                            </span>
-                        </label>
-                        <input
-                            name="startTimestamp"
-                            type="datetime-local"
-                            required
-                            className="rounded"
-                            min={formatDateInput(startOfHour(new Date()))}
-                            step={60 * 30}
-                            value={formatDateInput(startTimestamp)}
-                            onChange={handleStartChange}
-                        ></input>
-                    </div>
-                    <div className="mb-6">
-                        <label className="block" htmlFor="endTimestamp">
-                            <span className="leading-7 text-sm text-current">
-                                End Date & Time
-                            </span>
-                        </label>
-                        <input
-                            name="endTimestamp"
-                            type="datetime-local"
-                            required
-                            className="rounded"
-                            min={formatDateInput(
-                                addHours(startOfHour(new Date()), 1)
-                            )}
-                            step={60 * 30}
-                            value={formatDateInput(endTimestamp)}
-                            onChange={handleEndChange}
-                        ></input>
-                    </div>
-                    <div className="mb-6">
-                        <label className="block" htmlFor="continent">
-                            <span className="leading-7 text-sm text-current">
-                                Continent
-                            </span>
-                        </label>
-                        <select
-                            name="continent"
-                            required
-                            className="rounded"
-                            onChange={handleContinentChange}
-                            value={continent}
-                        >
-                            <option value="Indar">Indar</option>
-                            <option value="Amerish">Amerish</option>
-                            <option value="Esamir">Esamir</option>
-                            <option value="Hossin">Hossin</option>
-                            <option value="Oshur">Oshur</option>
-                        </select>
-                    </div>
-                    <div className="mb-6">
-                        <label className="block" htmlFor="base">
-                            <span className="leading-7 text-sm text-current">
-                                Base
-                            </span>
-                        </label>
-                        <select name="base" required className="rounded">
-                            {bases.map((base) => (
-                                <option key={base.id} value={base.id}>
-                                    {base.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    <button
-                        type="submit"
-                        className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm w-full sm:w-auto px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
-                    >
-                        Reserve Bases
-                    </button>
+                    <input
+                        name="startTimestamp"
+                        type="hidden"
+                        hidden
+                        value={formatDateInput(startTimestamp)}
+                    ></input>
+                    <input
+                        name="endTimestamp"
+                        type="hidden"
+                        hidden
+                        value={formatDateInput(endTimestamp)}
+                    ></input>
                 </Form>
             </ClientOnly>
         </div>

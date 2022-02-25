@@ -77,7 +77,7 @@ export default function Reserve() {
                         />
                         <button
                             type="submit"
-                            className="btn btn-square btn-primary"
+                            className="btn btn-primary btn-square"
                         >
                             <ArrowCircleRightIcon className="h-5 w-5" />
                         </button>

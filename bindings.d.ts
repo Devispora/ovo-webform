@@ -5,4 +5,4 @@ declare global {
     const COOKIE_SECRET: string;
     const OVO_TOKEN_SERVICE: string;
     const OVO_KV: KVNamespace;
-  }
+}

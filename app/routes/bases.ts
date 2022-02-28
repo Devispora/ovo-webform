@@ -1,6 +1,10 @@
 import { json, LoaderFunction } from "remix";
 import { getContinentBases } from "~/services/bases.server";
-import { Continent } from "~/services/constants";
+import { Base, Continent } from "~/services/constants";
+
+export type BasesLoaderData = {
+    bases: Base[];
+};
 
 export const loader: LoaderFunction = async ({ request, context }) => {
     let url = new URL(request.url);

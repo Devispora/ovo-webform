@@ -60,7 +60,7 @@ export const loader: LoaderFunction = async ({ request, context }) => {
 
 export default function Reserve() {
     return (
-        <div className="container mx-auto content-center">
+        <div className="container mx-auto grid h-screen w-full place-content-center">
             <h1 className="text-xl ">You need to provide your access code!</h1>
             <form className="">
                 <div className="form-control">
@@ -77,7 +77,7 @@ export default function Reserve() {
                         />
                         <button
                             type="submit"
-                            className="btn btn-primary btn-square"
+                            className="btn btn-square btn-primary"
                         >
                             <ArrowCircleRightIcon className="h-5 w-5" />
                         </button>

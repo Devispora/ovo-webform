@@ -12,7 +12,7 @@
         "dev:css": "tailwindcss -o ./app/tailwind.css --watch",
         "dev:wrangler": "cross-env NODE_ENV=development wrangler pages dev ./public --watch ./build --binding $(cat .env) --kv OVO_KV",
         "dev:remix": "cross-env NODE_ENV=development remix watch",
-        "dev": "cross-env NODE_ENV=development remix build && run-p dev:*",
+        "dev": "run-p dev:*",
         "start": "cross-env NODE_ENV=production npm run dev:wrangler"
     },
     "dependencies": {

@@ -13,7 +13,7 @@ export const loader: LoaderFunction = async ({ request, context }) => {
         ? (url.searchParams.get("continent") as Continent)
         : "Indar";
 
-    const bases = getContinentBases(context.env.CENSUS_ID, continent);
+    const bases = getContinentBases(continent);
 
     return json(
         {

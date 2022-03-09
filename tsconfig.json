@@ -13,7 +13,7 @@
         "paths": {
             "~/*": ["./app/*"]
         },
-        "types": ["@cloudflare/workers-types", "@types/node"],
+        "types": ["@cloudflare/workers-types", "@types/node", "@types/flexsearch"],
 
         // Remix takes care of building everything in `remix build`.
         "noEmit": true

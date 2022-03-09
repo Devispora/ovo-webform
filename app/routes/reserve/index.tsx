@@ -1,5 +1,5 @@
-import { json, LoaderFunction, redirect } from "remix";
-import { decodeAndPartiallyValidateToken } from "~/services/session.server";
+import { json, LoaderFunction, redirect, useLoaderData } from "remix";
+import { decodeAndValidateToken } from "~/services/session.server";
 import { ArrowCircleRightIcon } from "@heroicons/react/solid";
 
 interface TokenResponse {
@@ -17,12 +17,12 @@ export const loader: LoaderFunction = async ({ request, context }) => {
 
     const token: string = session.get("token");
 
-    if (token) {
-        if (decodeAndPartiallyValidateToken(token)) {
-            loggedIn = true;
-        }
+    const url = new URL(request.url);
+
+    if (await decodeAndValidateToken(context, request, token)) {
+        loggedIn = true;
     } else {
-        const code = new URL(request.url).searchParams.get("code");
+        const code = url.searchParams.get("code");
 
         if (code) {
             try {
@@ -55,10 +55,14 @@ export const loader: LoaderFunction = async ({ request, context }) => {
         });
     }
 
-    return json({ test: true });
+    const reason = url.searchParams.get("reason");
+
+    return json({ reason: reason ? reason : "access" });
 };
 
 export default function Reserve() {
+    const loaderData = useLoaderData();
+
     return (
         <div className="container mx-auto grid h-screen w-full place-content-center">
             <h1 className="text-xl ">You need to provide your access code!</h1>

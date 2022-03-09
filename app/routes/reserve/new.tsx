@@ -1,60 +1,57 @@
-import { addHours, roundToNearestMinutes } from "date-fns";
-import { format, zonedTimeToUtc } from "date-fns-tz";
-import React, { ChangeEvent, useEffect, useState } from "react";
+import {
+    addHours,
+    formatDuration,
+    intervalToDuration,
+    isPast,
+    roundToNearestMinutes,
+    isBefore,
+    isAfter,
+} from "date-fns";
+import { utcToZonedTime, zonedTimeToUtc } from "date-fns-tz";
+import React, {
+    Reducer,
+    useEffect,
+    useMemo,
+    useReducer,
+    useState,
+} from "react";
 import {
     Form,
     ActionFunction,
     redirect,
     LoaderFunction,
-    useFetcher,
     HeadersFunction,
     LinksFunction,
+    json,
+    useNavigate,
+    useLoaderData,
 } from "remix";
-import { hasActiveSession } from "~/services/session.server";
+import { decodeAndValidateToken } from "~/services/session.server";
 import { ClientOnly } from "remix-utils";
 import DatePicker from "~/components/DatePicker";
 import antdStyles from "antd/dist/antd.css";
+import SelectSearchCSS from "react-select-search/style.css";
 import { CalendarFilled } from "@ant-design/icons";
-import { TrashIcon } from "@heroicons/react/outline";
-import { BasesLoaderData } from "../bases";
 import { reserveBases } from "~/services/bases.server";
+import BaseRow from "~/components/BaseRow";
+import { FormDataObject, objectFromFormData } from "~/services/utils.server";
+import classNames from "classnames";
 
 const { RangePicker } = DatePicker;
 
 export const links: LinksFunction = () => {
-    return [{ rel: "stylesheet", href: antdStyles }];
+    return [
+        { rel: "stylesheet", href: antdStyles },
+        { rel: "stylesheet", href: SelectSearchCSS },
+    ];
 };
-
-interface FormDataObject {
-    [K: string]: any;
-}
 
 type ReservationData = FormDataObject & {
     groups: string;
-    bases: string[];
+    bases: string[] | string;
     startTimestamp: string;
     endTimestamp: string;
-    timezone: string;
 };
-
-function objectFromFormData<T extends FormDataObject>(
-    formData: FormData,
-    obj: T = Object.create({})
-): T {
-    let values = obj;
-
-    for (let [key, value] of formData.entries()) {
-        if (values[key]) {
-            if (!(values[key] instanceof Array)) {
-                values[key] = new Array(values[key]);
-            }
-            values[key].push(value);
-        } else {
-            values[key] = value;
-        }
-    }
-    return values;
-}
 
 export const action: ActionFunction = async ({ request, context }) => {
     const session = await context.sessionStorage.getSession(
@@ -68,31 +65,29 @@ export const action: ActionFunction = async ({ request, context }) => {
 
         const data = objectFromFormData<ReservationData>(formData);
 
-        console.log(data);
-
-        const { groups, timezone, startTimestamp, endTimestamp, bases } = data;
-
-        const startDatetime = zonedTimeToUtc(
-            startTimestamp as string,
-            timezone as string
-        );
-
-        const endDatetime = zonedTimeToUtc(
-            endTimestamp as string,
-            timezone as string
-        );
+        const { groups, startTimestamp, endTimestamp, bases } = data;
 
         try {
-            const response = await reserveBases(
-                token,
+            const reservationResponse = await reserveBases(
                 context.env.OVO_BASE_SERVICE as string,
+                token,
                 groups as string,
-                bases.map((base) => Number.parseInt(base)),
-                startDatetime.getTime() / 1000,
-                endDatetime.getTime() / 1000
+                Array.isArray(bases)
+                    ? bases.map((base) => Number.parseInt(base))
+                    : [Number.parseInt(bases)],
+                Number.parseInt(startTimestamp),
+                Number.parseInt(endTimestamp)
             );
 
-            console.log(await response.json());
+            if (reservationResponse) {
+                console.log(reservationResponse);
+                if (reservationResponse.failed.length > 0) {
+                    return json(reservationResponse, {
+                        status: 409,
+                    });
+                } else {
+                }
+            }
         } catch (err) {
             console.log(err);
         }
@@ -101,16 +96,18 @@ export const action: ActionFunction = async ({ request, context }) => {
     return redirect("/");
 };
 
-function formatDateInput(date: Date): string {
-    return format(date, "yyyy-MM-dd'T'HH:mm");
-}
+type LoaderData = {
+    validUntil: number;
+};
 
 export const loader: LoaderFunction = async ({ request, context }) => {
-    if (!(await hasActiveSession(context, request))) {
+    const token = await decodeAndValidateToken(context, request);
+
+    if (!token) {
         return redirect("/reserve");
     }
 
-    return null;
+    return json({ validUntil: token.exp });
 };
 
 export const headers: HeadersFunction = () => {
@@ -119,82 +116,104 @@ export const headers: HeadersFunction = () => {
     };
 };
 
-interface BaseProps {
-    id: number;
-    deleteBase: (index: number) => void;
-}
+type BasesState = {
+    lastBaseID: number;
+    bases: { [K: number]: number | null };
+};
 
-function BaseRow(props: BaseProps) {
-    const fetcher = useFetcher<BasesLoaderData>();
-
-    useEffect(() => {
-        if (fetcher.type === "init") {
-            fetcher.load("/bases");
-        }
-    }, [fetcher]);
-
-    let continentBases = fetcher.data ? fetcher.data.bases : [];
-
-    function handleContinentChange(event: ChangeEvent<HTMLSelectElement>) {
-        const newContinent = event.target.value;
-        fetcher.load(`/bases?continent=${newContinent}`);
-    }
-
-    return (
-        <fieldset
-            name={`base-${props.id}`}
-            className="col-span-6 grid grid-cols-6 gap-6 rounded-lg border border-solid border-gray-300 p-3 shadow"
-        >
-            <div className="col-span-6 sm:col-span-2 sm:col-start-1">
-                <label
-                    htmlFor="continent"
-                    className="block text-sm font-medium text-gray-700"
-                >
-                    Continent
-                </label>
-                <select
-                    id="continent"
-                    onChange={handleContinentChange}
-                    className="mt-1 block w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-                >
-                    <option value="Indar">Indar</option>
-                    <option value="Amerish">Amerish</option>
-                    <option value="Esamir">Esamir</option>
-                    <option value="Hossin">Hossin</option>
-                    <option value="Oshur">Oshur</option>
-                </select>
-            </div>
-            <div className="col-span-6 sm:col-span-6 lg:col-span-3">
-                <label
-                    htmlFor="base"
-                    className="block text-sm font-medium text-gray-700"
-                >
-                    Base
-                </label>
-                <select
-                    name="bases"
-                    required
-                    className="mt-1 block w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-                >
-                    {continentBases.map((base) => (
-                        <option key={base.id} value={base.id}>
-                            {base.name}
-                        </option>
-                    ))}
-                </select>
-            </div>
-        </fieldset>
-    );
-}
+export type BasesAction =
+    | { type: "delete"; id: number }
+    | { type: "create" }
+    | { type: "update"; id: number; facility: number | null };
 
 export default function NewReservation() {
-    let [reservationBases, setReservationBases] = useState([{}, {}]);
+    const loaderData = useLoaderData<LoaderData>();
+    let navigate = useNavigate();
+
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    const tokenExpiration = utcToZonedTime(
+        new Date(loaderData.validUntil * 1000),
+        timezone
+    );
+
+    const [expiryDuration, setExpiryDuration] = useState(
+        intervalToDuration({
+            start: new Date(),
+            end: tokenExpiration,
+        })
+    );
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setExpiryDuration(
+                intervalToDuration({
+                    start: new Date(),
+                    end: tokenExpiration,
+                })
+            );
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, []);
+
+    useEffect(() => {
+        if (isPast(tokenExpiration)) {
+            navigate("/reserve?reason=tokenExpired");
+        }
+    }, [expiryDuration]);
+
+    let [reservationBases, dispatchBases] = useReducer<
+        Reducer<BasesState, BasesAction>
+    >(
+        (state: BasesState, action: BasesAction) => {
+            switch (action.type) {
+                case "create": {
+                    return {
+                        lastBaseID: state.lastBaseID + 1,
+                        bases: {
+                            ...state.bases,
+                            [state.lastBaseID + 1]: null,
+                        },
+                    };
+                }
+                case "update": {
+                    return {
+                        lastBaseID: state.lastBaseID,
+                        bases: {
+                            ...state.bases,
+                            [action.id]: action.facility,
+                        },
+                    };
+                }
+                case "delete": {
+                    let newState = { ...state };
+
+                    delete newState.bases[action.id];
+
+                    return newState;
+                }
+            }
+        },
+        {
+            lastBaseID: 0,
+            bases: {
+                0: null,
+            },
+        }
+    );
+
+    const numBases = useMemo(
+        () => Object.keys(reservationBases.bases).length,
+        [reservationBases]
+    );
 
     let [startTimestamp, setStartTimestamp] = useState<Date>(
         roundToNearestMinutes(new Date(), {
             nearestTo: 30,
         })
     );
+    let [duration, setDuration] = useState(1);
     let [endTimestamp, setEndTimestamp] = useState<Date>(
         addHours(startTimestamp, 1)
     );
@@ -202,9 +221,20 @@ export default function NewReservation() {
 
     useEffect(() => {
         if (!customEnd) {
-            setEndTimestamp(addHours(startTimestamp, 1));
+            setEndTimestamp(addHours(startTimestamp, duration));
         }
-    }, [startTimestamp]);
+    }, [startTimestamp, duration, customEnd]);
+
+    const startTimeUTC = useMemo(
+        () =>
+            zonedTimeToUtc(startTimestamp, timezone as string).getTime() / 1000,
+        [startTimestamp]
+    );
+
+    const endTimeUTC = useMemo(
+        () => zonedTimeToUtc(endTimestamp, timezone as string).getTime() / 1000,
+        [endTimestamp]
+    );
 
     function handleRangeChange(
         values: [Date | null, Date | null] | null,
@@ -212,146 +242,213 @@ export default function NewReservation() {
         info: { range: "start" | "end" }
     ) {
         if (info.range === "start") {
-            if (values?.[0]) {
+            if (values?.[0] && values[1] && endTimestamp === values[1]) {
                 setStartTimestamp(values[0]);
+            } else if (values?.[1]) {
+                setStartTimestamp(values[1]);
             }
         } else {
-            if (values?.[1]) {
+            if (values?.[0] && values[1] && isAfter(values[0], values[1])) {
                 setCustomEnd(true);
                 setEndTimestamp(values[1]);
+            } else if (values?.[0]) {
+                setCustomEnd(true);
+                setEndTimestamp(values[0]);
             }
         }
     }
 
-    function addBase() {
-        setReservationBases([...reservationBases, {}]);
-    }
+    let isAlmostExpired = expiryDuration.minutes && expiryDuration.minutes < 5;
+    let countdownClass = classNames(
+        "text-medium col-span-1 col-start-3 text-center font-semibold",
+        {
+            "text-red-700": isAlmostExpired,
+        }
+    );
 
-    function deleteBase(index: number) {}
-
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    let readyToSubmit = useMemo(
+        () =>
+            Object.values(reservationBases.bases).every(
+                (baseID) => baseID !== null
+            ),
+        [reservationBases]
+    );
 
     return (
-        <div className="m-auto grid h-full w-full place-content-center bg-slate-100">
+        <div className="m-auto grid h-screen w-screen place-content-center overflow-auto bg-slate-100">
             <Form reloadDocument method="post" className="rounded-lg p-4">
                 <div className="mt-10 sm:mt-0">
-                    <div className="md:grid md:grid-cols-2 md:gap-6">
-                        <div className="mt-5 md:col-span-2 md:mt-0">
-                            <div className="overflow-hidden shadow sm:rounded-md">
-                                <div className="grid grid-cols-3 bg-white px-4 py-5 sm:p-6">
-                                    <div className="col-span-3 grid grid-cols-4 gap-6">
-                                        <div className="col-span-4 sm:col-span-3">
-                                            <label
-                                                htmlFor="groups"
-                                                className="block text-sm font-medium text-gray-700"
-                                            >
-                                                Groups
-                                            </label>
-                                            <input
-                                                type="text"
-                                                name="groups"
-                                                id="groups"
-                                                required
-                                                autoFocus
-                                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                            />
-                                        </div>
-                                        <div className="col-span-4 sm:col-span-4">
-                                            <label
-                                                htmlFor="timerange"
-                                                className="block text-sm font-medium text-gray-700"
-                                            >
-                                                Time Range
-                                            </label>
-                                            <ClientOnly
-                                                fallback={
-                                                    <input
-                                                        type="text"
-                                                        name="date-range"
-                                                        id="date-range"
-                                                        required
-                                                        autoFocus
-                                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                                    />
+                    <div className="mt-5 md:mt-0">
+                        <div className="shadow sm:rounded-md">
+                            <div className="grid grid-cols-3 bg-white px-4 py-5 sm:p-6">
+                                <div className="col-span-3 mb-2 grid grid-cols-3 border-b-2">
+                                    <p className="col-span-1 text-xl font-bold">
+                                        Bases Reservation Form
+                                    </p>
+                                    <ClientOnly>
+                                        <p className={countdownClass}>
+                                            {formatDuration(expiryDuration)}
+                                        </p>
+                                    </ClientOnly>
+                                </div>
+                                <div className="col-span-3 grid grid-cols-4 gap-6">
+                                    <div className="col-span-4 sm:col-span-3">
+                                        <label
+                                            htmlFor="groups"
+                                            className="block text-sm font-medium text-gray-700"
+                                        >
+                                            Groups
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="groups"
+                                            id="groups"
+                                            required
+                                            autoFocus
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                        />
+                                    </div>
+                                    <div className="col-span-4 sm:col-span-4">
+                                        <label
+                                            htmlFor="timerange"
+                                            className="block text-sm font-medium text-gray-700"
+                                        >
+                                            Time Range
+                                        </label>
+                                        <ClientOnly
+                                            fallback={
+                                                <input
+                                                    type="text"
+                                                    name="date-range"
+                                                    id="date-range"
+                                                    required
+                                                    autoFocus
+                                                    className="mt-1 block w-4/6 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                                />
+                                            }
+                                        >
+                                            <RangePicker
+                                                name="timerange"
+                                                showTime
+                                                bordered
+                                                minuteStep={15}
+                                                size="large"
+                                                format="YYYY-MM-DD HH:mm z"
+                                                disabledDate={(current) =>
+                                                    isBefore(
+                                                        current,
+                                                        new Date()
+                                                    )
                                                 }
-                                            >
-                                                <RangePicker
-                                                    name="timerange"
-                                                    showTime
-                                                    bordered
-                                                    minuteStep={15}
-                                                    size="large"
-                                                    format="YYYY-MM-DD HH:mm z"
-                                                    defaultValue={[
-                                                        startTimestamp,
-                                                        endTimestamp,
-                                                    ]}
-                                                    onCalendarChange={
-                                                        handleRangeChange
-                                                    }
-                                                    suffixIcon={
-                                                        <CalendarFilled />
-                                                    }
-                                                    style={{
-                                                        borderRadius: "0.25rem",
-                                                    }}
-                                                    renderExtraFooter={() => {
-                                                        return <p>Test</p>;
-                                                    }}
-                                                    value={[
-                                                        startTimestamp,
-                                                        endTimestamp,
-                                                    ]}
-                                                ></RangePicker>
-                                            </ClientOnly>
-                                        </div>
-                                        {reservationBases.map((base, index) => {
+                                                onCalendarChange={
+                                                    handleRangeChange
+                                                }
+                                                suffixIcon={<CalendarFilled />}
+                                                style={{
+                                                    borderRadius: "0.25rem",
+                                                    marginTop: "0.25rem",
+                                                }}
+                                                className="mt-1 block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                                renderExtraFooter={() => {
+                                                    return (
+                                                        <div className="flex space-x-2">
+                                                            <button
+                                                                type="button"
+                                                                className="my-2 rounded-lg bg-emerald-400 px-2 font-medium hover:bg-emerald-500"
+                                                                onClick={() => {
+                                                                    setCustomEnd(
+                                                                        false
+                                                                    );
+                                                                    setDuration(
+                                                                        1
+                                                                    );
+                                                                }}
+                                                            >
+                                                                Duration: 1
+                                                                Hours
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="my-2 rounded-lg bg-emerald-400 px-2 font-medium hover:bg-emerald-500"
+                                                                onClick={() => {
+                                                                    setCustomEnd(
+                                                                        false
+                                                                    );
+                                                                    setDuration(
+                                                                        2
+                                                                    );
+                                                                }}
+                                                            >
+                                                                Duration: 2
+                                                                Hours
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                }}
+                                                value={[
+                                                    startTimestamp,
+                                                    endTimestamp,
+                                                ]}
+                                            ></RangePicker>
+                                        </ClientOnly>
+                                    </div>
+                                    {Object.keys(reservationBases.bases).map(
+                                        (baseKey) => {
+                                            const base =
+                                                reservationBases.bases[
+                                                    Number.parseInt(baseKey)
+                                                ];
+
                                             return (
                                                 <BaseRow
-                                                    key={index}
-                                                    id={index}
-                                                    deleteBase={deleteBase}
+                                                    key={baseKey}
+                                                    id={Number.parseInt(
+                                                        baseKey
+                                                    )}
+                                                    facilityID={base}
+                                                    canDelete={numBases > 1}
+                                                    dispatch={dispatchBases}
+                                                    from={startTimeUTC}
+                                                    to={endTimeUTC}
                                                 />
                                             );
-                                        })}
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={addBase}
-                                        className="w-30 col-span-1 col-start-2 mt-4 flex justify-center rounded-md bg-green-700 px-2 py-2 text-center text-white shadow-sm hover:bg-green-800"
-                                    >
-                                        Add Base
-                                    </button>
+                                        }
+                                    )}
                                 </div>
-                                <div className="bg-gray-60 w-full px-4 py-3 text-right sm:px-6">
-                                    <button
-                                        type="submit"
-                                        className="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                                    >
-                                        Reserve
-                                    </button>
-                                </div>
+                                <button
+                                    type="button"
+                                    disabled={numBases === 4}
+                                    onClick={() => {
+                                        dispatchBases({ type: "create" });
+                                    }}
+                                    className="w-30 col-span-1 col-start-2 mt-4 flex justify-center rounded-md bg-green-700 px-2 py-2 text-center text-white shadow-sm hover:bg-green-800 disabled:opacity-50"
+                                >
+                                    Add Base
+                                </button>
+                            </div>
+                            <div className="bg-gray-60 w-full px-4 py-3 text-right sm:px-6">
+                                <button
+                                    type="submit"
+                                    disabled={!readyToSubmit}
+                                    className="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
+                                >
+                                    Reserve
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
                 <input
-                    name="timezone"
-                    type="hidden"
-                    hidden
-                    value={timezone}
-                ></input>
-                <input
                     name="startTimestamp"
                     type="hidden"
                     hidden
-                    value={formatDateInput(startTimestamp)}
+                    value={startTimeUTC}
                 ></input>
                 <input
                     name="endTimestamp"
                     type="hidden"
                     hidden
-                    value={formatDateInput(endTimestamp)}
+                    value={endTimeUTC}
                 ></input>
             </Form>
         </div>

@@ -1,2 +1,5 @@
 build
 coverage
+.cache
+.mf
+.husky

@@ -40,7 +40,7 @@ type OvOBaseReservationResponse = {
         succeeded_reservations: OvOReservation[];
         failed_reservations: OvOReservation[];
     };
-}
+};
 
 export async function reserveBases(
     baseService: string,
@@ -71,9 +71,13 @@ export async function reserveBases(
 
     if (body.result) {
         return {
-            reserved: body.result.succeeded_reservations.map(reservation => reservation.facility_id),
-            failed: body.result.failed_reservations.map(reservation => reservation.facility_id)
-        }
+            reserved: body.result.succeeded_reservations.map(
+                (reservation) => reservation.facility_id
+            ),
+            failed: body.result.failed_reservations.map(
+                (reservation) => reservation.facility_id
+            ),
+        };
     }
 }
 

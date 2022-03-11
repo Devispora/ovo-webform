@@ -35,8 +35,18 @@ async function updateBases() {
                         region.facility_type_id !== "0"
                 )
                 .map((region) => {
+                    let facilityName = region.facility_name;
+
+                    if (region.facility_type_id === "4") {
+                        facilityName += " Tech";
+                    } else if (region.facility_type_id === "3") {
+                        facilityName += " Bio";
+                    } else if (region.facility_type_id === "2") {
+                        facilityName += " Amp Station";
+                    }
+
                     return {
-                        name: region.facility_name,
+                        name: facilityName,
                         id: Number.parseInt(region.facility_id),
                     };
                 });
@@ -44,14 +54,24 @@ async function updateBases() {
             bases[continent] = continentBases;
         } else {
             const res = await fetch(
-                `https://census.daybreakgames.com/get/ps2:v2/map_region/?zone_id=${ContinentIDMapping[continent]}&facility_type_id=!7&c:limit=1000&c:show=facility_name,facility_id`
+                `https://census.daybreakgames.com/get/ps2:v2/map_region/?zone_id=${ContinentIDMapping[continent]}&facility_type_id=!7&c:limit=1000&c:show=facility_name,facility_id,facility_type_id`
             );
 
             const resBody = await res.json();
 
             const continentBases = resBody.map_region_list.map((region) => {
+                let facilityName = region.facility_name;
+
+                if (region.facility_type_id === "4") {
+                    facilityName += " Tech";
+                } else if (region.facility_type_id === "3") {
+                    facilityName += " Bio";
+                } else if (region.facility_type_id === "2") {
+                    facilityName += " Amp Station";
+                }
+
                 return {
-                    name: region.facility_name,
+                    name: facilityName,
                     id: Number.parseInt(region.facility_id),
                 };
             });

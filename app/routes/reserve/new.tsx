@@ -258,7 +258,10 @@ export default function NewReservation() {
         }
     }
 
-    let isAlmostExpired = expiryDuration.minutes && expiryDuration.minutes < 5;
+    let isAlmostExpired =
+        (expiryDuration.minutes && expiryDuration.minutes < 5) ||
+        !expiryDuration.minutes;
+
     let countdownClass = classNames(
         "text-medium col-span-1 col-start-3 text-center font-semibold",
         {

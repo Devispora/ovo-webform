@@ -18,8 +18,8 @@
     { "name": "Saerro Listening Post", "id": 248000 },
     { "name": "Waterson's Redemption", "id": 249000 },
     { "name": "Andvari Containment Site", "id": 400326 },
-    { "name": "Freyr", "id": 253000 },
-    { "name": "Eisa", "id": 254000 },
+    { "name": "Freyr Amp Station", "id": 253000 },
+    { "name": "Eisa Tech", "id": 254000 },
     { "name": "Nott Communications", "id": 256000 },
     { "name": "Ymir", "id": 257000 },
     { "name": "Echo Valley Substation", "id": 244100 },
@@ -40,9 +40,9 @@
     { "name": "BL-4 Recovery Point", "id": 400133 },
     { "name": "Tapp Waystation", "id": 400134 },
     { "name": "Untapped Reservoir", "id": 400135 },
-    { "name": "Baldur", "id": 400314 },
+    { "name": "Baldur Amp Station", "id": 400314 },
     { "name": "Vidar Observation Site", "id": 400315 },
     { "name": "Ymir Containment Site", "id": 400327 },
-    { "name": "Jord", "id": 400317 },
+    { "name": "Jord Amp Station", "id": 400317 },
     { "name": "Spral Oasis", "id": 400328 }
 ]

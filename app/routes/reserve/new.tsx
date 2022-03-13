@@ -25,6 +25,7 @@ import {
     json,
     useNavigate,
     useLoaderData,
+    useActionData,
 } from "remix";
 import { decodeAndValidateToken } from "~/services/session.server";
 import { ClientOnly } from "remix-utils";
@@ -51,6 +52,11 @@ type ReservationData = FormDataObject & {
     bases: string[] | string;
     startTimestamp: string;
     endTimestamp: string;
+};
+
+type ActionData = {
+    reserved: number[];
+    failed: number[];
 };
 
 export const action: ActionFunction = async ({ request, context }) => {
@@ -80,7 +86,6 @@ export const action: ActionFunction = async ({ request, context }) => {
             );
 
             if (reservationResponse) {
-                console.log(reservationResponse);
                 if (reservationResponse.failed.length > 0) {
                     return json(reservationResponse, {
                         status: 409,
@@ -128,7 +133,10 @@ export type BasesAction =
 
 export default function NewReservation() {
     const loaderData = useLoaderData<LoaderData>();
-    let navigate = useNavigate();
+    const actionData = useActionData<ActionData>();
+    // TODO: Show reservation errors
+
+    const navigate = useNavigate();
 
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -215,7 +223,7 @@ export default function NewReservation() {
     );
     let [duration, setDuration] = useState(1);
     let [endTimestamp, setEndTimestamp] = useState<Date>(
-        addHours(startTimestamp, 1)
+        addHours(startTimestamp, duration)
     );
     let [customEnd, setCustomEnd] = useState<boolean>(false);
 
@@ -242,13 +250,13 @@ export default function NewReservation() {
         info: { range: "start" | "end" }
     ) {
         if (info.range === "start") {
-            if (values?.[0] && values[1] && endTimestamp === values[1]) {
+            if (values?.[0]) {
                 setStartTimestamp(values[0]);
             } else if (values?.[1]) {
                 setStartTimestamp(values[1]);
             }
         } else {
-            if (values?.[0] && values[1] && isAfter(values[0], values[1])) {
+            if (values?.[0] && values[1] && isAfter(values[1], values[0])) {
                 setCustomEnd(true);
                 setEndTimestamp(values[1]);
             } else if (values?.[0]) {
@@ -388,6 +396,10 @@ export default function NewReservation() {
                                                         </div>
                                                     );
                                                 }}
+                                                defaultValue={[
+                                                    startTimestamp,
+                                                    endTimestamp,
+                                                ]}
                                                 value={[
                                                     startTimestamp,
                                                     endTimestamp,

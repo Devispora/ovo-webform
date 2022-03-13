@@ -25,9 +25,8 @@ import {
     isValid,
     getWeek as _getWeek,
     startOfWeek,
-    parse as parseDate,
 } from "date-fns";
-import { format as formatDate } from "date-fns-tz";
+import { format as formatDate, toDate as parseDate } from "date-fns-tz";
 import * as Locale from "date-fns/locale";
 
 function dealLocal(str: string) {

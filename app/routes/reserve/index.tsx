@@ -57,11 +57,15 @@ export const loader: LoaderFunction = async ({ request, context }) => {
 
     const reason = url.searchParams.get("reason");
 
-    return json({ reason: reason ? reason : "access" });
+    return json({
+        reason: reason ? reason : "access",
+        channel: context.env.RESERVATION_CHANNEL,
+    });
 };
 
 export default function Reserve() {
-    const loaderData = useLoaderData();
+    const { reason, channel } =
+        useLoaderData<{ reason: string; channel: string }>();
 
     return (
         <div className="container mx-auto grid h-screen w-full place-content-center">
@@ -86,6 +90,16 @@ export default function Reserve() {
                             <ArrowCircleRightIcon className="h-5 w-5" />
                         </button>
                     </div>
+                    <p className="mt-1 text-sm font-light text-gray-600">
+                        You can get one{" "}
+                        <a
+                            target="_blank"
+                            className="text-blue-600 underline visited:text-purple-600 hover:text-blue-800"
+                            href={channel}
+                        >
+                            here
+                        </a>
+                    </p>
                 </div>
             </form>
         </div>

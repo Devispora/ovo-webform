@@ -139,31 +139,11 @@ export default function BaseRow(props: BaseProps) {
                     >
                         Base
                     </label>
-                    {/** <select
-                        name="bases"
-                        required
-                        onChange={handleBaseChange}
-                        className="mt-1 block w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-                    >
-                        {continentBases.map((base) => (
-                            <option
-                                key={base.id}
-                                value={base.id}
-                                disabled={
-                                    base.id in availableBases
-                                        ? !availableBases[base.id]
-                                        : false
-                                }
-                                className="disabled:bg-slate-400 disabled:text-white"
-                            >
-                                {base.name}
-                            </option>
-                        ))}
-                    </select>*/}
                     <SelectSearch
                         options={searchOptions}
                         search
                         emptyMessage={"No bases found"}
+                        autoComplete="off"
                         placeholder="Select a base"
                         value={`${props.facilityID}`}
                         onChange={handleBaseChange}
@@ -173,7 +153,10 @@ export default function BaseRow(props: BaseProps) {
 
                                 const searchResult = baseIndex.search(
                                     query,
-                                    10
+                                    10,
+                                    {
+                                        suggest: true,
+                                    }
                                 );
 
                                 if (searchResult.length === 0) return [];
@@ -187,16 +170,25 @@ export default function BaseRow(props: BaseProps) {
                                 return searchBases;
                             };
                         }}
-                        renderValue={(valueProps, ref, selectedValue) => {
+                        renderValue={(valueProps, snapshot, selectedValue) => {
                             return (
                                 <input
-                                    name="bases"
+                                    id="bases"
                                     {...valueProps}
-                                    className="relative mt-1 block w-full rounded-md border border-gray-300 bg-white py-2 px-3 text-sm font-medium shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+                                    className="mt-1 block w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
                                 />
                             );
                         }}
                     ></SelectSearch>
+                    <input
+                        type="hidden"
+                        name="bases"
+                        value={
+                            props.facilityID
+                                ? props.facilityID.toString()
+                                : "some base"
+                        }
+                    ></input>
                 </div>
             </fieldset>
         </div>

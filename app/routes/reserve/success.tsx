@@ -102,7 +102,7 @@ export const ErrorBoundary: ErrorBoundaryComponent = ({ error }) => {
             </p>
             <p className="text-lg font-semibold">
                 Please try again. If the service continues to have issues,
-                please contact a PSB Admin.
+                please contact an OvO Admin.
             </p>
         </div>
     );

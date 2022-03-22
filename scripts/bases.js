@@ -94,6 +94,17 @@ async function updateBases() {
             JSON.stringify(bases[continent])
         );
     }
+
+    await fs.writeFile(
+        "./app/bases/All.json",
+        JSON.stringify([
+            ...bases.Amerish,
+            ...bases.Esamir,
+            ...bases.Hossin,
+            ...bases.Indar,
+            ...bases.Oshur,
+        ])
+    );
 }
 
 (async () => await updateBases())();

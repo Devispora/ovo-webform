@@ -6,6 +6,7 @@ import { XIcon } from "@heroicons/react/solid";
 import { Document } from "flexsearch";
 import { Base } from "~/services/constants";
 import SelectSearch, { SelectedOptionValue } from "react-select-search";
+//import Select, { components } from "react-select";
 
 interface BaseProps {
     id: number;
@@ -80,7 +81,7 @@ export default function BaseRow(props: BaseProps) {
         });
     }
 
-    const searchOptions = useMemo(
+    const baseOptions = useMemo(
         () =>
             continentBases.map((base) => {
                 return {
@@ -92,7 +93,7 @@ export default function BaseRow(props: BaseProps) {
                             : false,
                 };
             }),
-        [continentBases]
+        [continentBases, availableBases]
     );
 
     return (
@@ -140,7 +141,7 @@ export default function BaseRow(props: BaseProps) {
                         Base
                     </label>
                     <SelectSearch
-                        options={searchOptions}
+                        options={baseOptions}
                         search
                         emptyMessage={"No bases found"}
                         autoComplete="off"
@@ -172,11 +173,35 @@ export default function BaseRow(props: BaseProps) {
                         }}
                         renderValue={(valueProps, snapshot, selectedValue) => {
                             return (
+                                // @ts-expect-error
                                 <input
                                     id="bases"
                                     {...valueProps}
                                     className="mt-1 block w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
                                 />
+                            );
+                        }}
+                        renderOption={(
+                            domProps,
+                            optionData,
+                            snapshot,
+                            className
+                        ) => {
+                            return (
+                                // @ts-expect-error
+                                <button
+                                    {...domProps}
+                                    className={`h-full w-full py-2 disabled:bg-red-600 disabled:bg-opacity-60 ${
+                                        snapshot.selected
+                                            ? "bg-green-300"
+                                            : "hover:bg-green-200"
+                                    }`}
+                                >
+                                    {
+                                        // @ts-expect-error
+                                        optionData.name
+                                    }
+                                </button>
                             );
                         }}
                     ></SelectSearch>

@@ -4,6 +4,7 @@ import HossinBases from "../bases/Hossin.json";
 import IndarBases from "../bases/Indar.json";
 import EsamirBases from "../bases/Esamir.json";
 import OshurBases from "../bases/Oshur.json";
+import AllBases from "../bases/All.json";
 
 type ReservationType = "large_event" | "scrim" | "training" | "pog";
 
@@ -16,7 +17,7 @@ interface OvOBaseRequest {
     end_time?: number;
 }
 
-type OvOReservation = {
+export type OvOReservation = {
     reservation_id: string;
     facility_id: number;
     continent: string;
@@ -67,18 +68,7 @@ export async function reserveBases(
         },
     });
 
-    const body = await res.json<OvOBaseReservationResponse>();
-
-    if (body.result) {
-        return {
-            reserved: body.result.succeeded_reservations.map(
-                (reservation) => reservation.facility_id
-            ),
-            failed: body.result.failed_reservations.map(
-                (reservation) => reservation.facility_id
-            ),
-        };
-    }
+    return await res.json<OvOBaseReservationResponse>();
 }
 
 export async function getAvailableBases(
@@ -123,4 +113,8 @@ export function getContinentBases(continent: Continent): Base[] {
         case "Oshur":
             return OshurBases;
     }
+}
+
+export function getBases(bases: number[]): Base[] {
+    return AllBases.filter((base) => bases.includes(base.id));
 }

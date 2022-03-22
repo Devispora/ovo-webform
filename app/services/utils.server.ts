@@ -13,10 +13,12 @@ export function objectFromFormData<T extends FormDataObject>(
 
         if (values[typedKey]) {
             if (!(values[key] instanceof Array)) {
+                // @ts-expect-error
                 values[typedKey] = new Array(values[key]);
             }
             values[key].push(value);
         } else {
+            // @ts-expect-error
             values[key] = value;
         }
     }

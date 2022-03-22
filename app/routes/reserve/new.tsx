@@ -1,20 +1,6 @@
-import {
-    addHours,
-    formatDuration,
-    intervalToDuration,
-    isPast,
-    roundToNearestMinutes,
-    isBefore,
-    isAfter,
-} from "date-fns";
-import { utcToZonedTime, zonedTimeToUtc } from "date-fns-tz";
-import React, {
-    Reducer,
-    useEffect,
-    useMemo,
-    useReducer,
-    useState,
-} from "react";
+import { addHours, formatDuration, startOfHour } from "date-fns";
+import { zonedTimeToUtc } from "date-fns-tz";
+import React, { Reducer, useMemo, useReducer, useState } from "react";
 import {
     Form,
     ActionFunction,
@@ -23,22 +9,20 @@ import {
     HeadersFunction,
     LinksFunction,
     json,
-    useNavigate,
     useLoaderData,
     useActionData,
+    useCatch,
+    ErrorBoundaryComponent,
 } from "remix";
 import { decodeAndValidateToken } from "~/services/session.server";
 import { ClientOnly } from "remix-utils";
-import DatePicker from "~/components/DatePicker";
 import antdStyles from "antd/dist/antd.css";
 import SelectSearchCSS from "react-select-search/style.css";
-import { CalendarFilled } from "@ant-design/icons";
-import { reserveBases } from "~/services/bases.server";
 import BaseRow from "~/components/BaseRow";
-import { FormDataObject, objectFromFormData } from "~/services/utils.server";
 import classNames from "classnames";
-
-const { RangePicker } = DatePicker;
+import { createReservation } from "~/services/reservation.server";
+import DateTimeRangePicker from "~/components/DateTimeRangePicker";
+import useSessionTimer from "~/utils/sessionTimer";
 
 export const links: LinksFunction = () => {
     return [
@@ -47,58 +31,18 @@ export const links: LinksFunction = () => {
     ];
 };
 
-type ReservationData = FormDataObject & {
-    groups: string;
-    bases: string[] | string;
-    startTimestamp: string;
-    endTimestamp: string;
-};
-
 type ActionData = {
     reserved: number[];
     failed: number[];
 };
 
 export const action: ActionFunction = async ({ request, context }) => {
-    const session = await context.sessionStorage.getSession(
-        request.headers.get("Cookie")
-    );
-
-    const token: string = session.get("token");
-
-    if (token) {
-        const formData = await request.formData();
-
-        const data = objectFromFormData<ReservationData>(formData);
-
-        const { groups, startTimestamp, endTimestamp, bases } = data;
-
-        try {
-            const reservationResponse = await reserveBases(
-                context.env.OVO_BASE_SERVICE as string,
-                token,
-                groups as string,
-                Array.isArray(bases)
-                    ? bases.map((base) => Number.parseInt(base))
-                    : [Number.parseInt(bases)],
-                Number.parseInt(startTimestamp),
-                Number.parseInt(endTimestamp)
-            );
-
-            if (reservationResponse) {
-                if (reservationResponse.failed.length > 0) {
-                    return json(reservationResponse, {
-                        status: 409,
-                    });
-                } else {
-                }
-            }
-        } catch (err) {
-            console.log(err);
-        }
+    try {
+        return await createReservation(request, context);
+    } catch (err) {
+        context.sentry.captureException(err);
+        throw err;
     }
-
-    return redirect("/");
 };
 
 type LoaderData = {
@@ -106,19 +50,18 @@ type LoaderData = {
 };
 
 export const loader: LoaderFunction = async ({ request, context }) => {
-    const token = await decodeAndValidateToken(context, request);
+    try {
+        const token = await decodeAndValidateToken(context, request);
 
-    if (!token) {
-        return redirect("/reserve");
+        if (!token) {
+            return redirect("/reserve");
+        }
+
+        return json({ validUntil: token.exp });
+    } catch (err) {
+        context.sentry.captureException(err);
+        throw err;
     }
-
-    return json({ validUntil: token.exp });
-};
-
-export const headers: HeadersFunction = () => {
-    return {
-        "Cache-Control": "public, max-age=0, must-revalidate",
-    };
 };
 
 type BasesState = {
@@ -136,40 +79,12 @@ export default function NewReservation() {
     const actionData = useActionData<ActionData>();
     // TODO: Show reservation errors
 
-    const navigate = useNavigate();
-
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-    const tokenExpiration = utcToZonedTime(
-        new Date(loaderData.validUntil * 1000),
+    const expiryDuration = useSessionTimer(
+        loaderData.validUntil * 1000,
         timezone
     );
-
-    const [expiryDuration, setExpiryDuration] = useState(
-        intervalToDuration({
-            start: new Date(),
-            end: tokenExpiration,
-        })
-    );
-
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setExpiryDuration(
-                intervalToDuration({
-                    start: new Date(),
-                    end: tokenExpiration,
-                })
-            );
-        }, 1000);
-
-        return () => clearInterval(interval);
-    }, []);
-
-    useEffect(() => {
-        if (isPast(tokenExpiration)) {
-            navigate("/reserve?reason=tokenExpired");
-        }
-    }, [expiryDuration]);
 
     let [reservationBases, dispatchBases] = useReducer<
         Reducer<BasesState, BasesAction>
@@ -211,27 +126,13 @@ export default function NewReservation() {
         }
     );
 
-    const numBases = useMemo(
-        () => Object.keys(reservationBases.bases).length,
-        [reservationBases]
-    );
-
     let [startTimestamp, setStartTimestamp] = useState<Date>(
-        roundToNearestMinutes(new Date(), {
-            nearestTo: 30,
-        })
+        startOfHour(addHours(new Date(), 1))
     );
     let [duration, setDuration] = useState(1);
     let [endTimestamp, setEndTimestamp] = useState<Date>(
         addHours(startTimestamp, duration)
     );
-    let [customEnd, setCustomEnd] = useState<boolean>(false);
-
-    useEffect(() => {
-        if (!customEnd) {
-            setEndTimestamp(addHours(startTimestamp, duration));
-        }
-    }, [startTimestamp, duration, customEnd]);
 
     const startTimeUTC = useMemo(
         () =>
@@ -244,27 +145,10 @@ export default function NewReservation() {
         [endTimestamp]
     );
 
-    function handleRangeChange(
-        values: [Date | null, Date | null] | null,
-        _dateStrings: [string, string],
-        info: { range: "start" | "end" }
-    ) {
-        if (info.range === "start") {
-            if (values?.[0]) {
-                setStartTimestamp(values[0]);
-            } else if (values?.[1]) {
-                setStartTimestamp(values[1]);
-            }
-        } else {
-            if (values?.[0] && values[1] && isAfter(values[1], values[0])) {
-                setCustomEnd(true);
-                setEndTimestamp(values[1]);
-            } else if (values?.[0]) {
-                setCustomEnd(true);
-                setEndTimestamp(values[0]);
-            }
-        }
-    }
+    const numBases = useMemo(
+        () => Object.keys(reservationBases.bases).length,
+        [reservationBases]
+    );
 
     let isAlmostExpired =
         (expiryDuration.minutes && expiryDuration.minutes < 5) ||
@@ -326,86 +210,20 @@ export default function NewReservation() {
                                         >
                                             Time Range
                                         </label>
-                                        <ClientOnly
-                                            fallback={
-                                                <input
-                                                    type="text"
-                                                    name="date-range"
-                                                    id="date-range"
-                                                    required
-                                                    autoFocus
-                                                    className="mt-1 block w-4/6 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                                />
-                                            }
-                                        >
-                                            <RangePicker
-                                                name="timerange"
-                                                showTime
-                                                bordered
-                                                minuteStep={15}
-                                                size="large"
-                                                format="YYYY-MM-DD HH:mm z"
-                                                disabledDate={(current) =>
-                                                    isBefore(
-                                                        current,
-                                                        new Date()
-                                                    )
-                                                }
-                                                onCalendarChange={
-                                                    handleRangeChange
-                                                }
-                                                suffixIcon={<CalendarFilled />}
-                                                style={{
-                                                    borderRadius: "0.25rem",
-                                                    marginTop: "0.25rem",
-                                                }}
-                                                className="mt-1 block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                                renderExtraFooter={() => {
-                                                    return (
-                                                        <div className="flex space-x-2">
-                                                            <button
-                                                                type="button"
-                                                                className="my-2 rounded-lg bg-emerald-400 px-2 font-medium hover:bg-emerald-500"
-                                                                onClick={() => {
-                                                                    setCustomEnd(
-                                                                        false
-                                                                    );
-                                                                    setDuration(
-                                                                        1
-                                                                    );
-                                                                }}
-                                                            >
-                                                                Duration: 1
-                                                                Hours
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                className="my-2 rounded-lg bg-emerald-400 px-2 font-medium hover:bg-emerald-500"
-                                                                onClick={() => {
-                                                                    setCustomEnd(
-                                                                        false
-                                                                    );
-                                                                    setDuration(
-                                                                        2
-                                                                    );
-                                                                }}
-                                                            >
-                                                                Duration: 2
-                                                                Hours
-                                                            </button>
-                                                        </div>
-                                                    );
-                                                }}
-                                                defaultValue={[
-                                                    startTimestamp,
-                                                    endTimestamp,
-                                                ]}
-                                                value={[
-                                                    startTimestamp,
-                                                    endTimestamp,
-                                                ]}
-                                            ></RangePicker>
-                                        </ClientOnly>
+                                        <DateTimeRangePicker
+                                            startTimestampProps={[
+                                                startTimestamp,
+                                                setStartTimestamp,
+                                            ]}
+                                            endTimestampProps={[
+                                                endTimestamp,
+                                                setEndTimestamp,
+                                            ]}
+                                            durationProps={[
+                                                duration,
+                                                setDuration,
+                                            ]}
+                                        />
                                     </div>
                                     {Object.keys(reservationBases.bases).map(
                                         (baseKey) => {
@@ -469,3 +287,21 @@ export default function NewReservation() {
         </div>
     );
 }
+
+export function CatchBoundary() {
+    const caught = useCatch();
+}
+
+export const ErrorBoundary: ErrorBoundaryComponent = ({ error }) => {
+    return (
+        <div className="m-auto grid h-screen w-screen place-content-center">
+            <p className="text-9xl font-extrabold text-red-900">
+                An error has occurred!
+            </p>
+            <p className="text-lg font-semibold">
+                Please try again. If the service continues to have issues,
+                please contact a PSB Admin.
+            </p>
+        </div>
+    );
+};

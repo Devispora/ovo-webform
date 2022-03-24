@@ -3,54 +3,55 @@ import {
     json,
     LoaderFunction,
     redirect,
+    Session,
     useCatch,
     useLoaderData,
 } from "remix";
-import { decodeAndValidateToken } from "~/services/session.server";
+import {
+    decodeAndValidateToken,
+    exchangeCode,
+} from "~/services/session.server";
 import { ArrowCircleRightIcon } from "@heroicons/react/solid";
-
-interface TokenResponse {
-    error?: { [errorName: string]: string };
-    result?: {
-        jwt: string;
-    };
-}
 
 export const loader: LoaderFunction = async ({ request, context }) => {
     try {
         const { getSession, commitSession } = context.sessionStorage;
-        const session = await getSession(request.headers.get("Cookie"));
+        const session: Session = await getSession(
+            request.headers.get("Cookie")
+        );
 
         let loggedIn = false;
 
-        const token: string = session.get("token");
-
         const url = new URL(request.url);
 
-        if (await decodeAndValidateToken(context, request, token)) {
+        const code = url.searchParams.get("code");
+
+        const existingToken = await decodeAndValidateToken(context, request);
+
+        if (existingToken) {
+            if (code && existingToken.redeem_code !== code) {
+                const token = await exchangeCode(
+                    context.env.OVO_TOKEN_SERVICE as string,
+                    code
+                );
+
+                if (token) {
+                    session.set("token", token);
+                }
+            }
+
             loggedIn = true;
         } else {
-            const code = url.searchParams.get("code");
-
             if (code) {
-                try {
-                    const response = await fetch(
-                        context.env.OVO_TOKEN_SERVICE as string,
-                        {
-                            method: "POST",
-                            body: JSON.stringify({
-                                code,
-                            }),
-                        }
-                    );
+                const token = await exchangeCode(
+                    context.env.OVO_TOKEN_SERVICE as string,
+                    code
+                );
 
-                    const resBody: TokenResponse = await response.json();
-
-                    session.set("token", resBody.result?.jwt);
+                if (token) {
+                    session.set("token", token);
 
                     loggedIn = true;
-                } catch (err) {
-                    console.log(err);
                 }
             }
         }

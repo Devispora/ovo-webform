@@ -59,3 +59,29 @@ export async function hasActiveSession(
 
     return false;
 }
+
+export interface TokenResponse {
+    error?: { [errorName: string]: string };
+    result?: {
+        jwt: string;
+    };
+}
+
+export async function exchangeCode(tokenService: string, code: string) {
+    const response = await fetch(tokenService, {
+        method: "POST",
+        body: JSON.stringify({
+            code,
+        }),
+    });
+
+    const resBody: TokenResponse = await response.json();
+
+    if (resBody.result) {
+        return resBody.result.jwt;
+    } else if (resBody.error) {
+        const errorName = Object.keys(resBody.error)[0];
+        const errorDetails = Object.values(resBody.error)[0];
+        throw new Error(`${errorName}: ${errorDetails}`);
+    }
+}

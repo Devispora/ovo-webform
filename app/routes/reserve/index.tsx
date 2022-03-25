@@ -29,30 +29,38 @@ export const loader: LoaderFunction = async ({ request, context }) => {
         const existingToken = await decodeAndValidateToken(context, request);
 
         if (existingToken) {
-            if (code && existingToken.redeem_code !== code) {
-                const token = await exchangeCode(
+            if (code && existingToken.ovo_claims?.redeem_code !== code) {
+                const exchange = await exchangeCode(
                     context.env.OVO_TOKEN_SERVICE as string,
                     code
                 );
 
-                if (token) {
-                    session.set("token", token);
+                if (exchange?.token) {
+                    session.set("token", exchange.token);
+                } else if (exchange?.error) {
+                    return json({
+                        error: exchange.error.name,
+                        channel: context.env.RESERVATION_CHANNEL,
+                    });
                 }
             }
 
             loggedIn = true;
-        } else {
-            if (code) {
-                const token = await exchangeCode(
-                    context.env.OVO_TOKEN_SERVICE as string,
-                    code
-                );
+        } else if (code) {
+            const exchange = await exchangeCode(
+                context.env.OVO_TOKEN_SERVICE as string,
+                code
+            );
 
-                if (token) {
-                    session.set("token", token);
+            if (exchange?.token) {
+                session.set("token", exchange.token);
 
-                    loggedIn = true;
-                }
+                loggedIn = true;
+            } else if (exchange?.error) {
+                return json({
+                    error: exchange.error.name,
+                    channel: context.env.RESERVATION_CHANNEL,
+                });
             }
         }
 
@@ -64,10 +72,7 @@ export const loader: LoaderFunction = async ({ request, context }) => {
             });
         }
 
-        const reason = url.searchParams.get("reason");
-
         return json({
-            reason: reason ? reason : "access",
             channel: context.env.RESERVATION_CHANNEL,
         });
     } catch (err) {
@@ -77,12 +82,20 @@ export const loader: LoaderFunction = async ({ request, context }) => {
 };
 
 export default function Reserve() {
-    const { reason, channel } =
-        useLoaderData<{ reason: string; channel: string }>();
+    const { error, channel } =
+        useLoaderData<{ error?: string; channel: string }>();
+
+    let friendlyError = "";
+
+    if (error) {
+        if (error === "CodeNoLongerValid") {
+            friendlyError = "Code is either invalid or has expired";
+        }
+    }
 
     return (
         <div className="container mx-auto grid h-screen w-full place-content-center">
-            <h1 className="text-xl ">You need to provide your access code!</h1>
+            <h1 className="text-xl ">You need to provide an access code!</h1>
             <form className="">
                 <div className="form-control">
                     <label className="label">
@@ -103,6 +116,9 @@ export default function Reserve() {
                             <ArrowCircleRightIcon className="h-5 w-5" />
                         </button>
                     </div>
+                    {error ? (
+                        <p className="text-xs text-red-400">{friendlyError}</p>
+                    ) : null}
                     <p className="mt-1 text-sm font-light text-gray-600">
                         You can get one{" "}
                         <a

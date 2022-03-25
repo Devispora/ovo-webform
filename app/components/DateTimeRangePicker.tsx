@@ -77,7 +77,6 @@ export default function DateTimeRangePicker(props: DateTimeRangePickerProps) {
                     name="date-range"
                     id="date-range"
                     required
-                    autoFocus
                     className="mt-1 block w-4/6 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 />
             }
@@ -86,6 +85,7 @@ export default function DateTimeRangePicker(props: DateTimeRangePickerProps) {
                 name="timerange"
                 showTime
                 bordered
+                allowClear={false}
                 minuteStep={15}
                 size="large"
                 format="YYYY-MM-DD HH:mm z"

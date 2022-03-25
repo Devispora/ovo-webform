@@ -6,7 +6,6 @@ import {
     ActionFunction,
     redirect,
     LoaderFunction,
-    HeadersFunction,
     LinksFunction,
     json,
     useLoaderData,
@@ -23,6 +22,7 @@ import classNames from "classnames";
 import { createReservation } from "~/services/reservation.server";
 import DateTimeRangePicker from "~/components/DateTimeRangePicker";
 import useSessionTimer from "~/utils/sessionTimer";
+import { PlusIcon } from "@heroicons/react/solid";
 
 export const links: LinksFunction = () => {
     return [
@@ -47,6 +47,7 @@ export const action: ActionFunction = async ({ request, context }) => {
 
 type LoaderData = {
     validUntil: number;
+    groups: string;
 };
 
 export const loader: LoaderFunction = async ({ request, context }) => {
@@ -57,7 +58,9 @@ export const loader: LoaderFunction = async ({ request, context }) => {
             return redirect("/reserve");
         }
 
-        return json({ validUntil: token.exp });
+        const groups = token.ovo_claims?.groups.join(", ");
+
+        return json({ validUntil: token.exp, groups });
     } catch (err) {
         context.sentry.captureException(err);
         throw err;
@@ -150,6 +153,8 @@ export default function NewReservation() {
         [reservationBases]
     );
 
+    const [groups, setGroups] = useState(loaderData.groups);
+
     let isAlmostExpired =
         (expiryDuration.minutes && expiryDuration.minutes < 5) ||
         !expiryDuration.minutes;
@@ -199,7 +204,10 @@ export default function NewReservation() {
                                             name="groups"
                                             id="groups"
                                             required
-                                            autoFocus
+                                            value={groups}
+                                            onChange={(event) =>
+                                                setGroups(event.target.value)
+                                            }
                                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                                         />
                                     </div>
@@ -254,16 +262,17 @@ export default function NewReservation() {
                                     onClick={() => {
                                         dispatchBases({ type: "create" });
                                     }}
-                                    className="w-30 col-span-1 col-start-2 mt-4 flex justify-center rounded-md bg-green-700 px-2 py-2 text-center text-white shadow-sm hover:bg-green-800 disabled:opacity-50"
+                                    className="w-30 col-span-1 col-start-2 mt-4 inline-flex justify-center rounded-md bg-indigo-600 px-2 py-2 text-center text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
                                 >
-                                    Add Base
+                                    <PlusIcon className="mx-1 h-5 w-5" />
+                                    Base
                                 </button>
                             </div>
                             <div className="bg-gray-60 w-full px-4 py-3 text-right sm:px-6">
                                 <button
                                     type="submit"
                                     disabled={!readyToSubmit}
-                                    className="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
+                                    className="inline-flex justify-center rounded-md border border-transparent bg-green-700 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-green-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
                                 >
                                     Reserve
                                 </button>

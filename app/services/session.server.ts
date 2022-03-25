@@ -1,11 +1,21 @@
 import { isBefore } from "date-fns";
-import { decodeJwt } from "jose";
+import { decodeJwt, JWTPayload } from "jose";
+
+export type OvOClaims = {
+    token_id: string;
+    redeem_code: string;
+    groups: string[];
+};
+
+export type JWTOvOPayload = {
+    ovo_claims?: OvOClaims;
+};
 
 export async function decodeAndValidateToken(
     context: any,
     request: Request,
     token?: string
-) {
+): Promise<(JWTPayload & JWTOvOPayload) | null> {
     if (token) {
         const payload = decodeJwt(token);
 
@@ -78,10 +88,13 @@ export async function exchangeCode(tokenService: string, code: string) {
     const resBody: TokenResponse = await response.json();
 
     if (resBody.result) {
-        return resBody.result.jwt;
+        return { token: resBody.result.jwt };
     } else if (resBody.error) {
-        const errorName = Object.keys(resBody.error)[0];
-        const errorDetails = Object.values(resBody.error)[0];
-        throw new Error(`${errorName}: ${errorDetails}`);
+        return {
+            error: {
+                name: Object.keys(resBody.error)[0],
+                value: Object.values(resBody.error)[0],
+            },
+        };
     }
 }

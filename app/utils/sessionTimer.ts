@@ -30,7 +30,7 @@ export default function useSessionTimer(expiration: number, timezone: string) {
 
     useEffect(() => {
         if (isPast(sessionExpiration)) {
-            navigate("/reserve?reason=tokenExpired");
+            navigate("/reserve");
         }
     }, [expiryDuration]);
 

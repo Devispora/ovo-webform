@@ -23,6 +23,7 @@ import { createReservation } from "~/services/reservation.server";
 import DateTimeRangePicker from "~/components/DateTimeRangePicker";
 import useSessionTimer from "~/utils/sessionTimer";
 import { PlusIcon } from "@heroicons/react/solid";
+import ErrorComponent from "~/components/Error";
 
 export const links: LinksFunction = () => {
     return [
@@ -63,7 +64,13 @@ export const loader: LoaderFunction = async ({ request, context }) => {
         return json({ validUntil: token.exp, groups });
     } catch (err) {
         context.sentry.captureException(err);
-        throw err;
+
+        throw new Response(
+            JSON.stringify({ channelLink: context.env.ASK_STAFF_CHANNEL }),
+            {
+                status: 500,
+            }
+        );
     }
 };
 
@@ -299,18 +306,12 @@ export default function NewReservation() {
 
 export function CatchBoundary() {
     const caught = useCatch();
+
+    const catchData = JSON.parse(caught.data);
+
+    return <ErrorComponent channelLink={catchData.channelLink} />;
 }
 
 export const ErrorBoundary: ErrorBoundaryComponent = ({ error }) => {
-    return (
-        <div className="m-auto grid h-screen w-screen place-content-center">
-            <p className="text-9xl font-extrabold text-red-900">
-                An error has occurred!
-            </p>
-            <p className="text-lg font-semibold">
-                Please try again. If the service continues to have issues,
-                please contact an OvO Admin.
-            </p>
-        </div>
-    );
+    return <ErrorComponent />;
 };

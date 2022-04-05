@@ -51,7 +51,7 @@ export async function createReservation(request: Request, context: any) {
                         }
                     );
                 } else {
-                    session.set(
+                    session.flash(
                         "reservation",
                         JSON.stringify(
                             reservationResponse.result.succeeded_reservations

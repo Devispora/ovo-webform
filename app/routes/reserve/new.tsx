@@ -12,6 +12,7 @@ import {
     useActionData,
     useCatch,
     ErrorBoundaryComponent,
+    useTransition,
 } from "remix";
 import { decodeAndValidateToken } from "~/services/session.server";
 import { ClientOnly } from "remix-utils";
@@ -87,6 +88,7 @@ export type BasesAction =
 export default function NewReservation() {
     const loaderData = useLoaderData<LoaderData>();
     const actionData = useActionData<ActionData>();
+    const transition = useTransition();
     // TODO: Show reservation errors
 
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -183,65 +185,69 @@ export default function NewReservation() {
 
     return (
         <div className="m-auto grid h-screen w-screen place-content-center overflow-auto bg-slate-100">
-            <Form reloadDocument method="post" className="rounded-lg p-4">
-                <div className="mt-10 sm:mt-0">
-                    <div className="mt-5 md:mt-0">
-                        <div className="shadow sm:rounded-md">
-                            <div className="grid grid-cols-3 bg-white px-4 py-5 sm:p-6">
-                                <div className="col-span-3 mb-2 grid grid-cols-3 border-b-2">
-                                    <p className="col-span-1 text-xl font-bold">
-                                        Bases Reservation Form
-                                    </p>
-                                    <ClientOnly>
-                                        <p className={countdownClass}>
-                                            {formatDuration(expiryDuration)}
+            <Form method="post" className="rounded-lg p-4">
+                <fieldset disabled={transition.state === "submitting"}>
+                    <div className="mt-10 sm:mt-0">
+                        <div className="mt-5 md:mt-0">
+                            <div className="shadow sm:rounded-md">
+                                <div className="grid grid-cols-3 bg-white px-4 py-5 sm:p-6">
+                                    <div className="col-span-3 mb-2 grid grid-cols-3 border-b-2">
+                                        <p className="col-span-1 text-xl font-bold">
+                                            Bases Reservation Form
                                         </p>
-                                    </ClientOnly>
-                                </div>
-                                <div className="col-span-3 grid grid-cols-4 gap-6">
-                                    <div className="col-span-4 sm:col-span-3">
-                                        <label
-                                            htmlFor="groups"
-                                            className="block text-sm font-medium text-gray-700"
-                                        >
-                                            Groups
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="groups"
-                                            id="groups"
-                                            required
-                                            value={groups}
-                                            onChange={(event) =>
-                                                setGroups(event.target.value)
-                                            }
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                        />
+                                        <ClientOnly>
+                                            <p className={countdownClass}>
+                                                {formatDuration(expiryDuration)}
+                                            </p>
+                                        </ClientOnly>
                                     </div>
-                                    <div className="col-span-4 sm:col-span-4">
-                                        <label
-                                            htmlFor="timerange"
-                                            className="block text-sm font-medium text-gray-700"
-                                        >
-                                            Time Range
-                                        </label>
-                                        <DateTimeRangePicker
-                                            startTimestampProps={[
-                                                startTimestamp,
-                                                setStartTimestamp,
-                                            ]}
-                                            endTimestampProps={[
-                                                endTimestamp,
-                                                setEndTimestamp,
-                                            ]}
-                                            durationProps={[
-                                                duration,
-                                                setDuration,
-                                            ]}
-                                        />
-                                    </div>
-                                    {Object.keys(reservationBases.bases).map(
-                                        (baseKey) => {
+                                    <div className="col-span-3 grid grid-cols-4 gap-6">
+                                        <div className="col-span-4 sm:col-span-3">
+                                            <label
+                                                htmlFor="groups"
+                                                className="block text-sm font-medium text-gray-700"
+                                            >
+                                                Groups
+                                            </label>
+                                            <input
+                                                type="text"
+                                                name="groups"
+                                                id="groups"
+                                                required
+                                                value={groups}
+                                                onChange={(event) =>
+                                                    setGroups(
+                                                        event.target.value
+                                                    )
+                                                }
+                                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                            />
+                                        </div>
+                                        <div className="col-span-4 sm:col-span-4">
+                                            <label
+                                                htmlFor="timerange"
+                                                className="block text-sm font-medium text-gray-700"
+                                            >
+                                                Time Range
+                                            </label>
+                                            <DateTimeRangePicker
+                                                startTimestampProps={[
+                                                    startTimestamp,
+                                                    setStartTimestamp,
+                                                ]}
+                                                endTimestampProps={[
+                                                    endTimestamp,
+                                                    setEndTimestamp,
+                                                ]}
+                                                durationProps={[
+                                                    duration,
+                                                    setDuration,
+                                                ]}
+                                            />
+                                        </div>
+                                        {Object.keys(
+                                            reservationBases.bases
+                                        ).map((baseKey) => {
                                             const base =
                                                 reservationBases.bases[
                                                     Number.parseInt(baseKey)
@@ -260,33 +266,35 @@ export default function NewReservation() {
                                                     to={endTimeUTC}
                                                 />
                                             );
-                                        }
-                                    )}
+                                        })}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        disabled={numBases === 4}
+                                        onClick={() => {
+                                            dispatchBases({ type: "create" });
+                                        }}
+                                        className="w-30 col-span-1 col-start-2 mt-4 inline-flex justify-center rounded-md bg-indigo-600 px-2 py-2 text-center text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+                                    >
+                                        <PlusIcon className="mx-1 h-5 w-5" />
+                                        Base
+                                    </button>
                                 </div>
-                                <button
-                                    type="button"
-                                    disabled={numBases === 4}
-                                    onClick={() => {
-                                        dispatchBases({ type: "create" });
-                                    }}
-                                    className="w-30 col-span-1 col-start-2 mt-4 inline-flex justify-center rounded-md bg-indigo-600 px-2 py-2 text-center text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
-                                >
-                                    <PlusIcon className="mx-1 h-5 w-5" />
-                                    Base
-                                </button>
-                            </div>
-                            <div className="bg-gray-60 w-full px-4 py-3 text-right sm:px-6">
-                                <button
-                                    type="submit"
-                                    disabled={!readyToSubmit}
-                                    className="inline-flex justify-center rounded-md border border-transparent bg-green-700 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-green-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
-                                >
-                                    Reserve
-                                </button>
+                                <div className="bg-gray-60 w-full px-4 py-3 text-right sm:px-6">
+                                    <button
+                                        type="submit"
+                                        disabled={!readyToSubmit}
+                                        className="inline-flex justify-center rounded-md border border-transparent bg-green-700 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-green-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
+                                    >
+                                        {transition.state === "submitting"
+                                            ? "Reserving..."
+                                            : "Reserve"}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
+                </fieldset>
                 <input
                     name="startTimestamp"
                     type="hidden"

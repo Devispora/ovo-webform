@@ -16,7 +16,8 @@ import React from "react";
 
 export const loader: LoaderFunction = async ({ request, context }) => {
     try {
-        const session: Session = await context.sessionStorage.getSession(
+        const { getSession, commitSession } = context.sessionStorage;
+        const session: Session = await getSession(
             request.headers.get("Cookie")
         );
 
@@ -26,17 +27,28 @@ export const loader: LoaderFunction = async ({ request, context }) => {
             return redirect("/");
         }
 
+        if (session.get("token")) {
+            session.unset("token");
+        }
+
         const reservations: OvOReservation[] = JSON.parse(reservation);
 
         const bases = getBases(
             reservations.map((reservation) => reservation.facility_id)
         );
 
-        return json({
-            channel: context.env.RESERVATION_CHANNEL,
-            bases,
-            reservations,
-        });
+        return json(
+            {
+                channel: context.env.RESERVATION_CHANNEL,
+                bases,
+                reservations,
+            },
+            {
+                headers: {
+                    "Set-Cookie": await commitSession(session),
+                },
+            }
+        );
     } catch (err) {
         context.sentry.captureException(err);
 
